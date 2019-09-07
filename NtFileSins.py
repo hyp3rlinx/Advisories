@@ -26,6 +26,7 @@ import sys,argparse,re
 # By John Page (aka hyp3rlinx)                                        #
 # Apparition Security                                                 #
 #=====================================================================#
+# Original advisory: http://hyp3rlinx.altervista.org/advisories/MICROSOFT-WINDOWS-NTFS-PRIVILEGED-FILE-ACCESS-ENUMERATION.txt
 
 BANNER='''
     _   _______________ __    _____ _           
