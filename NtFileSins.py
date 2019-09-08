@@ -1,6 +1,9 @@
 from subprocess import Popen, PIPE
 import sys,argparse,re
 
+# NtFileSins v2
+# Added: Check for Zone.Identifer:$DATA to see if any identified files were downloaded from internet.
+#
 # Windows File Enumeration Intel Gathering.
 # Standard users can prove existence of privileged user artifacts.
 #
@@ -22,26 +25,28 @@ import sys,argparse,re
 # For evil or maybe check for basic malware IOC existence on disk with user-only rights.
 #
 #=====================================================================#
-# NtFileSins.py - Windows File Enumeration Intel Gathering Tool.      #
+# NtFileSins.py - Windows File Enumeration Intel Gathering Tool v2.   #
 # By John Page (aka hyp3rlinx)                                        #
 # Apparition Security                                                 #
 #=====================================================================#
-# Original advisory: http://hyp3rlinx.altervista.org/advisories/MICROSOFT-WINDOWS-NTFS-PRIVILEGED-FILE-ACCESS-ENUMERATION.txt
 
 BANNER='''
     _   _______________ __    _____ _           
    / | / /_  __/ ____(_) /__ / ___/(_)___  _____
   /  |/ / / / / /_  / / / _ \\__ \ / / __ \/ ___/
  / /|  / / / / __/ / / /  __/__/ / / / / (__  ) 
-/_/ |_/ /_/ /_/   /_/_/\___/____/_/_/ /_/____/                                                                                        
+/_/ |_/ /_/ /_/   /_/_/\___/____/_/_/ /_/____/  v2                                                                                     
  By hyp3rlinx
  ApparitionSec                                                                                                                     
 '''              
 
 sin_cnt=0
+internet_sin_cnt=0
 found_set=set()
+zone_set=set()
 ARTIFACTS_SET=set()
 ROOTDIR = "c:/Users/"
+ZONE_IDENTIFIER=":Zone.Identifier:$DATA"
 
 USER_DIRS=["Contacts","Desktop","Downloads","Favorites","My Documents","Searches","Videos/Captures",
            "Pictures","Music","OneDrive","OneDrive/Attachments","OneDrive/Documents"]
@@ -60,7 +65,7 @@ def usage():
     print "-u victim -d Downloads -a <name.ext> -s"
     print '-u victim -d Contacts -a "Mike N.contact"'
     print "-u victim -a APT.txt -b -n"
-    print "-u victim -d Desktop/MyFiles -a  <.name>"
+    print "-u victim -d -z Desktop/MyFiles -a  <.name>"
     print "-u victim -d Searches -a <name>.search-ms"
     print "-u victim -d . -a <name.ext>"
     print "-u victim -d desktop -a inverted-crosses.mp3 -b"
@@ -70,6 +75,7 @@ def usage():
     print "-u victim -f list_of_files.txt -x .txt"
     print "-u victim -d desktop -f list_of_files.txt -b"
     print "-u victim -d desktop -f list_of_files.txt  -x .rar"
+    print "-u victim -z -s -f list_of_files.txt"
 
 def parse_args():
     parser.add_argument("-u", "--user", help="Privileged user target")
@@ -80,6 +86,7 @@ def parse_args():
     parser.add_argument("-n", "--notfound", nargs="?", const="1", help="Display unfound artifacts.")
     parser.add_argument("-b", "--built_in_ext", nargs="?", const="1", help="Enumerate files using NtFileSin built-in ext types, if no extension is found NtFileSins will switch to this feature by default.")
     parser.add_argument("-x", "--specific_ext", nargs="?", help="Enumerate using specific ext, e.g. <.exe> using a supplied list of artifacts, a supplied ext will override any in the supplied artifact list.")
+    parser.add_argument("-z", "--zone_identifier", nargs="?", const="1", help="Identifies artifacts downloaded from the internet by checking for Zone.Identifier:$DATA.")
     parser.add_argument("-s", "--save", nargs="?", const="1", help="Saves successfully enumerated artifacts, will log to "+REPORT)
     parser.add_argument("-v", "--verbose", nargs="?", const="1", help="Displays the file access error messages.")
     parser.add_argument("-e", "--examples", nargs="?", const="1", help="Show example usage.")
@@ -154,7 +161,7 @@ def echo_results(args, res, x, i):
                 print "\t[-] not found: " + x +"/"+ i
     else:
         sin_cnt += 1
-        if args.save:
+        if args.save or args.zone_identifier:
             found_set.add(x+"/"+i)
         if args.verbose:
             print recon_msg(1)+ x+"/"+i
@@ -184,6 +191,20 @@ def search_missing_ext(path,args,i):
             res = access(ROOTDIR+args.user+"/"+x+"/"+i+e)
             echo_results(args, res, x, i+e)
 
+
+#Check if the found artifact was downloaded from internet
+def zone_identifier_check(args):
+    
+    global ROOTDIR, internet_sin_cnt
+    zone_set.update(found_set)
+    
+    for c in found_set:
+        c = c + ZONE_IDENTIFIER
+        res = access(ROOTDIR+args.user+"/"+c)
+        if res == "Access is denied.":
+           internet_sin_cnt += 1
+           print "\t[$] Zone Identifier found: "+c+" this file was downloaded over the internet!."
+           zone_set.add(c)
 
 
 def ntsins(path,args,i):
@@ -229,9 +250,6 @@ def search(args):
                 #all default user dirs
                 else:
                     ntsins(USER_DIRS,args,i)
-                
-    if args.save and len(found_set) != 0:
-        save()
         
 
 def check_dir_input(_dir):
@@ -293,8 +311,19 @@ def main(args):
         exit()
     else:
         search(args)
+
+    if sin_cnt >= 1 and args.zone_identifier:
+        zone_identifier_check(args)
+    
+    if args.save and len(found_set) != 0:
+        if len(zone_set) != 0:
+            found_set.update(zone_set)
+            save()
     
     print "\n\tNtFileSins Detected "+str(sin_cnt)+ " out of %s" % str(len(ARTIFACTS_SET)) + " Sins.\n"
+    
+    if args.zone_identifier and internet_sin_cnt >= 1:
+        print "\t"+str(internet_sin_cnt) + " of the sins were internet downloaded.\n"
     
     if not args.notfound:
         print "\tuse -n to display unfound enumerated files."
