@@ -1,8 +1,9 @@
 from subprocess import Popen, PIPE
 import sys,argparse,re
 
-# NtFileSins v2
+# NtFileSins v2.1
 # Added: Check for Zone.Identifer:$DATA to see if any identified files were downloaded from internet.
+# Fixed: save() logic to log report in case no Zone.Identifiers found.
 #
 # Windows File Enumeration Intel Gathering.
 # Standard users can prove existence of privileged user artifacts.
@@ -13,7 +14,7 @@ import sys,argparse,re
 # However, accessing files directly by attempting to "open" them from cmd.exe shell,
 # we can determine existence by compare inconsistent Windows error messages.
 #
-# Requirements: 1) target users with >= privileges.
+# Requirements: 1) target users with >= privileges (not admin to admin).
 #               2) artifacts must contain a dot "." or returns false positives.
 #
 # Windows message "Access Denied" = Exists
@@ -24,18 +25,18 @@ import sys,argparse,re
 # Profile other users by compare ntfs error messages to potentially learn their activities or machines purpose.
 # For evil or maybe check for basic malware IOC existence on disk with user-only rights.
 #
-#=====================================================================#
-# NtFileSins.py - Windows File Enumeration Intel Gathering Tool v2.   #
-# By John Page (aka hyp3rlinx)                                        #
-# Apparition Security                                                 #
-#=====================================================================#
+#======================================================================#
+# NtFileSins.py - Windows File Enumeration Intel Gathering Tool v2.1   #
+# By John Page (aka hyp3rlinx)                                         #
+# Apparition Security                                                  #
+#======================================================================#
 
 BANNER='''
     _   _______________ __    _____ _           
    / | / /_  __/ ____(_) /__ / ___/(_)___  _____
   /  |/ / / / / /_  / / / _ \\__ \ / / __ \/ ___/
  / /|  / / / / __/ / / /  __/__/ / / / / (__  ) 
-/_/ |_/ /_/ /_/   /_/_/\___/____/_/_/ /_/____/  v2                                                                                     
+/_/ |_/ /_/ /_/   /_/_/\___/____/_/_/ /_/____/  v2.1                                                                                     
  By hyp3rlinx
  ApparitionSec                                                                                                                     
 '''              
@@ -315,7 +316,9 @@ def main(args):
     if sin_cnt >= 1 and args.zone_identifier:
         zone_identifier_check(args)
     
-    if args.save and len(found_set) != 0:
+    if args.save and len(found_set) != 0 and not args.zone_identifier:
+        save()
+    else:
         if len(zone_set) != 0:
             found_set.update(zone_set)
             save()
