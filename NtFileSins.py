@@ -318,10 +318,10 @@ def main(args):
     
     if args.save and len(found_set) != 0 and not args.zone_identifier:
         save()
-    else:
-        if len(zone_set) != 0:
-            found_set.update(zone_set)
-            save()
+        
+    if args.save and len(zone_set) != 0:
+        found_set.update(zone_set)
+        save()
     
     print "\n\tNtFileSins Detected "+str(sin_cnt)+ " out of %s" % str(len(ARTIFACTS_SET)) + " Sins.\n"
     
